@@ -1,12 +1,30 @@
-ssvs = function(Y,
-                    X,
-                    tau0 = 0.01,
-                    tau1 = tau0 * 100,
-                    iterations = 1000,
-                    burn = 1000,
-                    s_prior = 0.01,
-                    S_prior = 0.01,
-                    standardise = FALSE) {
+#' 
+#' @title Stochastic Search Variable Selection
+#' @author Nikolas KUSCHNIG
+#' @description Uses the Gibbs sampler to simulate a sample from th
+#'
+#' @param Y The endogenous variable, must be convertible to a matrix.
+#' @param X The explanatory variables, must be convertible to a matrix.
+#' @param tau0 Number by which to scale an "unimportant" variable.
+#' @param tau1 Number by which to scale an "important" variable.
+#' @param save Number of iterations to be stored for calculating means.
+#' @param burn Number of iterations to be discarded before storing for calculating means.
+#' @param s_prior 
+#' @param S_prior 
+#' @param standardise A boolean determining whether to center and scale X & Y.
+#'
+#' @return Returns a list containing the means of posterior: inclusion probability, mean and standard deviation.
+#' @export
+
+ssvs = function(Y, 
+                X, 
+                tau0 = 0.01, 
+                tau1 = tau0 * 100, 
+                save = 5000, 
+                burn = 1000, 
+                s_prior = 0.01, 
+                S_prior = 0.01, 
+                standardise = FALSE) {
   Y = matrix(Y)
   X = as.matrix(cbind(rnorm(nrow(X), 0, 10), rnorm(nrow(X), 0, 1), X))
 
@@ -24,11 +42,11 @@ ssvs = function(Y,
   
   gamma = matrix(1, K, 1)
 
-  alpha_store = matrix(NA, iterations, K)
-  sigma_store = matrix(NA, iterations, 1)
-  gamma_store = matrix(NA, iterations, K)
+  alpha_store = matrix(NA, save, K)
+  sigma_store = matrix(NA, save, 1)
+  gamma_store = matrix(NA, save, K)
   
-  for(i in 1:(iterations + burn)) {
+  for(i in 1:(save + burn)) {
     V_prior = diag(as.numeric(gamma * tau1 + (1 - gamma) * tau0))
 
     V_post = solve(crossprod(X) / sigma_draw + diag(1 / diag(V_prior)))
@@ -55,12 +73,13 @@ ssvs = function(Y,
     }
   }
   
-  PIP_mean = apply(gamma_store, 2, mean)
+  pip_mean = apply(gamma_store, 2, mean)
   alpha_mean = apply(alpha_store, 2, mean)
   sigma_mean = apply(sigma_store, 2, mean)
   
-  out = list(PIP_mean, alpha_mean, sigma_mean)
-  #out = list(gamma_store, alpha_store, sigma_store)
+  out = list(pip_mean, alpha_mean, sigma_mean)
   
+  names(out) = c("Posterior Inclusion Probability", "Posterior Mean", "Posterior Standard Deviation")
+
   return(out)
 }
