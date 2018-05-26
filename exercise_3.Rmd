@@ -1,0 +1,153 @@
+---
+title: "Econometrics, Exercise 3"
+author: "Demirol, Engelen & Kuschnig"
+date: "26 Mai 2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(BMS)
+library(ggplot2)
+library(ggthemes)
+library(cowplot)
+source("exercise_3_ssvs.R")
+```
+
+## Part 1, Task 1
+
+We have written a function as per requirements and will demonstrate its capabilities and usefulness over the course of this document. The definition is displayed here, for the full code please consult the appendix.
+
+- **Parameters**: In its most basic form the function would only take the endogenous (Y) and exogenous (X) variables as parameters. Considering the importance of finding the right values for $\tau_{0,1}$ we should also be able to modify these parameters. According to most of the literature we have set the default value of $\tau_1$ as $\tau_0*100$. For $\tau_0$ we will utilise an automatic approach (see George, Sun & Ni 2006) as the default value, which we will discuss later. We also allow for varying the number of iterations - both in terms of values stored and burned. We adopt the non-informative priors from class but allow for fiddling by including them as parameters. Last but not least we provide an option for centering and scaling the endogenous and exogenous variables, which we will also discuss later.
+- **Output**: For handing over all the results that we might need we use a list. The central element of the output should generally be the posterior inclusion probabilities, but mean values and variances of $\beta$ and the mean $\sigma^2$ of the saved models should also prove helpful. We also include an element with metadata, i.e. parameters of the function call, with $\tau_{0,1}$ being the most interesting ones in the case of automatic estimation.
+
+```{r eval=FALSE, echo=TRUE}
+ssvs = function(y, 
+                X, 
+                tau0 = NULL, 
+                tau1 = tau0 * 100, 
+                save = 4000, 
+                burn = 1000, 
+                s_prior = 0.01,
+                S_prior = 0.01,
+                standardise = TRUE) {...}
+```
+
+Before testing the water we load the required dataset and decide on values for $\tau_0$ and $\tau_1$ (which we handle as a scalar for the former).
+
+```{r}
+data(datafls)
+
+y = datafls[, 1]
+X = datafls[, 2:ncol(datafls)]
+rm(datafls)
+
+tau0s = c(1, 1e-2, 1e-5, 1e-15)
+tau1_scales = c(100, 1000)
+```
+
+Then we run our function with the specified parameters. We do so three (ignoring the repetitions due to differing $\tau_{0,1}$) times:  
+1. with the plain data, i.e. non-standardised  
+2. with standardised data  
+3. with standardised data and our automatic approach to setting $\tau_{0,1}$
+
+```{r include=FALSE}
+pips = vector("list", length(tau0s) * length(tau1_scales))
+pips_z = vector("list", length(tau0s) * length(tau1_scales))
+pips_auto = vector("list", 1)
+```
+
+```{r}
+i = 1
+for(scale in tau1_scales) {
+  for(tau in tau0s) {
+    pips[[i]] = ssvs(y, X, tau0 = tau, tau1 = tau * scale, standardise = FALSE)[[1]]
+    names(pips)[i] = paste0(tau, " & *", scale)
+    i = i + 1
+  }
+}
+
+i = 1
+for(scale in tau1_scales) {
+  for(tau in tau0s) {
+    pips_z[[i]] = ssvs(y, X, tau0 = tau, tau1 = tau * scale, standardise = TRUE)[[1]]
+    names(pips_z)[i] = paste0(tau, " & *", scale)
+    i = i + 1
+  }
+}
+
+pips_auto = ssvs(y, X)[[1]]
+```
+
+We immediately take note of the fact that setting $\tau_0$ to very small values (such as 1e-15) is probably best suited for simulating the outcome of a coinflip. Pictured are the posterior inclusion probabilities of non-standardised and standardised run-throughs with $\tau_0$ = 1e-15 and $\tau_1$ = 100.
+
+```{r echo=FALSE}
+summary(pips[[4]])
+summary(pips_z[[4]])
+```
+
+Furthermore we notice that choosing a bigger scalar for $\tau_1$ leads to lower posterior inclusion probabilities, but comparable results overall. This is in line with the literature, where it is used to influence the amount of variables that should make it into the final model. Pictured are the posterior inclusion probabilities of standardised run-throughs with $\tau_0$ = 0.01 and $\tau_1$ = 100 / 1000.
+
+```{r echo=FALSE}
+summary(pips_z[[2]])
+summary(pips_z[[6]])
+```
+
+Processing the results graphically carries some further information:
+1. our coinflip-hypothesis is holding up
+2. standardising the data leads to more diverse and "nicer" posterior inclusion probabilities
+3. the automatic approach of using OLS estimates of the variance for $\tau_{0,1}$ has very similar results to our best guess of $\tau_0=0.01$ and $\tau_1=1$.
+
+```{r include=FALSE}
+df = data.frame(pips_z[[2]], pips_z[[4]], pips_z[[6]])
+df2 = data.frame(pips[[2]], pips[[4]], pips[[6]])
+names(df) = names(df2) = c("0.01(*100)", "1e-15(*100)", "0.01(*1000)")
+df$id = df2$id = 1:nrow(df)
+
+p1 = ggplot(df, aes(x = id, y = `0.01(*100)`)) +
+  geom_point(aes(colour = "0.01(*100)")) +
+  geom_smooth(aes(colour = "0.01(*100)"), alpha = 0.2, method = "loess") +
+  geom_point(aes(y = `1e-15(*100)`, colour = "1e-15(*100)")) +
+  geom_smooth(aes(y = `1e-15(*100)`, colour = "1e-15(*100)"), alpha = 0.2, method = "loess") +
+  geom_point(aes(y = `0.01(*1000)`, colour = "0.01(*1000)")) +
+  geom_smooth(aes(y = `0.01(*1000)`, colour = "0.01(*1000)"), alpha = 0.2, method = "loess") +
+  coord_cartesian(ylim = c(0, 1), expand = 0) +
+  ggtitle("Standardised results") +
+  theme_fivethirtyeight() +
+  scale_color_gdocs(name = "")
+
+p2 = ggplot(df2, aes(x = id, y = `0.01(*100)`)) +
+  geom_point(aes(colour = "0.01(*100)")) +
+  geom_smooth(aes(colour = "0.01(*100)"), alpha = 0.2, method = "loess") +
+  geom_point(aes(y = `1e-15(*100)`, colour = "1e-15(*100)")) +
+  geom_smooth(aes(y = `1e-15(*100)`, colour = "1e-15(*100)"), alpha = 0.2, method = "loess") +
+  geom_point(aes(y = `0.01(*1000)`, colour = "0.01(*1000)")) +
+  geom_smooth(aes(y = `0.01(*1000)`, colour = "0.01(*1000)"), alpha = 0.2, method = "loess") +
+  coord_cartesian(ylim = c(0, 1), expand = 0) +
+  ggtitle("Plain results") +
+  theme_fivethirtyeight() +
+  scale_color_gdocs(name = "")
+
+df3 = data.frame(pips_auto, pips_z[[2]], pips_z[[6]])
+names(df3) = c("automatic", "0.01(*100)", "0.01(*1000)")
+df3$id = 1:nrow(df)
+
+p3 = ggplot(df3, aes(x = id, y = automatic)) +
+  geom_point(aes(colour = "automatic")) +
+  geom_smooth(aes(colour = "automatic"), alpha = 0.2, method = "loess") +
+  geom_point(aes(y = `0.01(*100)`, colour = "z, 0.01(*100)")) +
+  geom_smooth(aes(y = `0.01(*100)`, colour = "z, 0.01(*100)"), alpha = 0.2, method = "loess") +
+  geom_point(aes(y = `0.01(*1000)`, colour = "z, 0.01(*1000)")) +
+  geom_smooth(aes(y = `0.01(*1000)`, colour = "z, 0.01(*1000)"), alpha = 0.2, method = "loess") +
+  coord_cartesian(ylim = c(0, 1), expand = 0) +
+  ggtitle("Automatic, best guess & parameters from class") +
+  theme_fivethirtyeight() +
+  scale_color_gdocs(name = "")
+```
+
+```{r echo=FALSE}
+plot_grid(p1, p2)
+p3
+```
+
+Note: While fitting a line to the observations doesn't seem to make a lot of sense considering the data, we think it provides an easily noticeable and overall decent visual representation.

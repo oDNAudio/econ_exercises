@@ -1,9 +1,9 @@
-#' 
+## ---- exercise_3_svss.R
 #' @title Stochastic Search Variable Selection
 #' @author Nikolas Kuschnig
 #' @description Uses the Gibbs sampler to perform SSVS
 #'
-#' @param Y The endogenous variable, must be convertible to a matrix.
+#' @param y The endogenous variable, must be convertible to a matrix.
 #' @param X The explanatory variables, must be convertible to a matrix.
 #' @param tau0 Number by which to scale an "unimportant" variable. Will use least squares estimates if not supplied.
 #' @param tau1 Number by which to scale an "important" variable. Defaults to 100 * tau0.
@@ -11,44 +11,44 @@
 #' @param burn Iterations to be discarded before calculating means.
 #' @param s_prior Prior accuracy, i.e. weight assigned to the prior
 #' @param S_prior 1 / sigma^2
-#' @param standardise A boolean determining whether to center and scale X & Y.
+#' @param standardise A boolean determining whether to center and scale X & y.
 #'
 #' @return Returns a list containing the means of posterior: inclusion probability, mean and standard deviation.
 #' @export
 
-ssvs = function(Y, 
+ssvs = function(y, 
                 X, 
                 tau0 = NULL, 
                 tau1 = tau0 * 100, 
-                save = 9000, 
+                save = 4000, 
                 burn = 1000, 
                 s_prior = 0.01,
                 S_prior = 0.01,
                 standardise = TRUE) {
-  Y = matrix(Y)
+  y = matrix(y)
   X = as.matrix(X)
 
-  N = nrow(Y)
+  N = nrow(y)
   K = ncol(X)
   
   # Standardise (i.e. center and scale) the data if desired
   if(standardise) {
-    Y = scale(Y)
+    y = scale(y)
     X = scale(X)
   }
   
   # If no tau0 was supplied set up for OLS estimates, otherwise vectorise
   if(is.null(tau0)) {
     c0 = 0.1
-    c1 = 10
+    c1 = ifelse(length(tau1) == 0, 10, tau1)
   } else {
     tau0 = rep(tau0, K)
     tau1 = rep(tau1, K)
   }
   
   # get OLS stuff
-  OLS = solve(crossprod(X)) %*% crossprod(X, Y)
-  SSE = as.numeric(crossprod(Y - X %*% OLS))
+  OLS = solve(crossprod(X)) %*% crossprod(X, y)
+  SSE = as.numeric(crossprod(y - X %*% OLS))
   sigma_draw = as.numeric(SSE / (N - K))
   V_beta_draw = sigma_draw * solve(crossprod(X))
   
@@ -71,7 +71,7 @@ ssvs = function(Y,
   for(i in 1:(save + burn)) {
     # Draw alpha
     V_post = solve(crossprod(X) / sigma_draw + diag(1 / diag(V_prior)))
-    alpha_post = V_post %*% (crossprod(X, Y) / sigma_draw)
+    alpha_post = V_post %*% (crossprod(X, y) / sigma_draw)
     alpha_draw = alpha_post + t(chol(V_post)) %*% rnorm(K)
     
     # Determine inclusion based on alpha
@@ -87,7 +87,7 @@ ssvs = function(Y,
     V_prior = diag(as.numeric(gamma * tau1 + (1 - gamma) * tau0))
     
     # Draw sigma^2
-    S_post = S_prior + crossprod(Y - X %*% alpha_draw) / 2
+    S_post = S_prior + crossprod(y - X %*% alpha_draw) / 2
     s_post = S_prior + N / 2
     sigma_draw = 1 / rgamma(1, s_post, S_post)
     V_beta_draw = diag(sigma_draw * solve(crossprod(X)))
