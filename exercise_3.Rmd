@@ -11,6 +11,7 @@ library(BMS)
 library(ggplot2)
 library(ggthemes)
 library(cowplot)
+library(knitr)
 source("exercise_3_ssvs.R")
 ```
 
@@ -145,9 +146,25 @@ p3 = ggplot(df3, aes(x = id, y = automatic)) +
   scale_color_gdocs(name = "")
 ```
 
-```{r echo=FALSE}
+```{r echo=FALSE, fig.height=4, fig.width=8}
 plot_grid(p1, p2)
 p3
 ```
 
 Note: While fitting a line to the observations doesn't seem to make a lot of sense considering the data, we think it provides an easily noticeable and overall decent visual representation.
+
+---
+
+## Part 2, Task 1
+
+Here we try reproduce Table 11.1 (Koop 2015) with our function.
+
+```{r include=FALSE}
+table = ssvs(y, X, save = 20000, burn = 5000)
+table_df = data.frame(names(table$pip), round(table$pip, 3), round(table$post_mean, 3), round(table$post_var_beta, 3), row.names = NULL)
+names(table_df) = c("Expl. Var.", "SSVS PIP", "Post. Mean", "Post. Beta-Var.")
+```
+
+```{r}
+kable(table_df)
+```
