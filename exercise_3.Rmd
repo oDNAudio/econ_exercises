@@ -7,20 +7,22 @@ output: pdf_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+options(knitr.table.format = "latex")
 library(BMS)
 library(ggplot2)
 library(ggthemes)
 library(cowplot)
 library(knitr)
+library(kableExtra)
 source("exercise_3_ssvs.R")
 ```
 
 ## Part 1, Task 1
 
-We have written a function as per requirements and will demonstrate its capabilities and usefulness over the course of this document. The definition is displayed here, for the full code please consult the appendix.
+We have written a function as per requirements and will demonstrate its capabilities and usefulness over the course of this document. The definition is displayed here, for the full code please consult the appendix.  
 
-- **Parameters**: In its most basic form the function would only take the endogenous (Y) and exogenous (X) variables as parameters. Considering the importance of finding the right values for $\tau_{0,1}$ we should also be able to modify these parameters. According to most of the literature we have set the default value of $\tau_1$ as $\tau_0*100$. For $\tau_0$ we will utilise an automatic approach (see George, Sun & Ni 2006) as the default value, which we will discuss later. We also allow for varying the number of iterations - both in terms of values stored and burned. We adopt the non-informative priors from class but allow for fiddling by including them as parameters. Last but not least we provide an option for centering and scaling the endogenous and exogenous variables, which we will also discuss later.
-- **Output**: For handing over all the results that we might need we use a list. The central element of the output should generally be the posterior inclusion probabilities, but mean values and variances of $\beta$ and the mean $\sigma^2$ of the saved models should also prove helpful. We also include an element with metadata, i.e. parameters of the function call, with $\tau_{0,1}$ being the most interesting ones in the case of automatic estimation.
+- **Parameters**: In its most basic form the function would only take the endogenous (Y) and exogenous (X) variables as parameters. Considering the importance of finding the right values for $\tau_{0,1}$ we should also be able to modify these parameters. According to most of the literature we have set the default value of $\tau_1$ as $\tau_0*100$. For $\tau_0$ we will utilise an automatic approach (see George, Sun & Ni 2006) as the default value, which we will discuss later. We also allow for varying the number of iterations - both in terms of values stored and burned. We adopt the non-informative priors from class but allow for fiddling by including them as parameters. Last but not least we provide an option for centering and scaling the endogenous and exogenous variables, which we will also discuss later.  
+- **Output**: For handing over all the results that we might need we use a list. The central element of the output should generally be the posterior inclusion probabilities, but mean values and variances of $\beta$ and the mean $\sigma^2$ of the saved models should also prove helpful. We also include an element with metadata, i.e. parameters of the function call, with $\tau_{0,1}$ being the most interesting ones in the case of automatic estimation.  
 
 ```{r eval=FALSE, echo=TRUE}
 ssvs = function(y, 
@@ -41,16 +43,16 @@ data(datafls)
 
 y = datafls[, 1]
 X = datafls[, 2:ncol(datafls)]
-rm(datafls)
 
 tau0s = c(1, 1e-2, 1e-5, 1e-15)
 tau1_scales = c(100, 1000)
 ```
 
 Then we run our function with the specified parameters. We do so three (ignoring the repetitions due to differing $\tau_{0,1}$) times:  
-1. with the plain data, i.e. non-standardised  
-2. with standardised data  
-3. with standardised data and our automatic approach to setting $\tau_{0,1}$
+
+- with the plain data, i.e. non-standardised  
+- with standardised data  
+- with standardised data and our automatic approach to setting $\tau_{0,1}$
 
 ```{r include=FALSE}
 pips = vector("list", length(tau0s) * length(tau1_scales))
@@ -80,24 +82,30 @@ for(scale in tau1_scales) {
 pips_auto = ssvs(y, X)[[1]]
 ```
 
-We immediately take note of the fact that setting $\tau_0$ to very small values (such as 1e-15) is probably best suited for simulating the outcome of a coinflip. Pictured are the posterior inclusion probabilities of non-standardised and standardised run-throughs with $\tau_0$ = 1e-15 and $\tau_1$ = 100.
+We immediately take note of the fact that setting $\tau_0$ to very small values (such as 1e-15) is probably best suited for simulating the outcome of a coinflip.  
+Pictured are the posterior inclusion probabilities of non-standardised and standardised run-throughs with $\tau_0$ = 1e-15 and $\tau_1$ = 100.
 
 ```{r echo=FALSE}
 summary(pips[[4]])
 summary(pips_z[[4]])
 ```
 
-Furthermore we notice that choosing a bigger scalar for $\tau_1$ leads to lower posterior inclusion probabilities, but comparable results overall. This is in line with the literature, where it is used to influence the amount of variables that should make it into the final model. Pictured are the posterior inclusion probabilities of standardised run-throughs with $\tau_0$ = 0.01 and $\tau_1$ = 100 / 1000.
+Furthermore we notice that choosing a bigger scalar for $\tau_1$ leads to lower posterior inclusion probabilities, but comparable results overall. This is in line with the literature, where it is used to influence the scarcity of the model, i.e. amount of variables that should make it into the final model.  
+Pictured are the posterior inclusion probabilities of standardised run-throughs with $\tau_0$ = 0.01 and $\tau_1$ = 100 and
+1000.
 
 ```{r echo=FALSE}
 summary(pips_z[[2]])
 summary(pips_z[[6]])
 ```
 
-Processing the results graphically carries some further information:
-1. our coinflip-hypothesis is holding up
-2. standardising the data leads to more diverse and "nicer" posterior inclusion probabilities
-3. the automatic approach of using OLS estimates of the variance for $\tau_{0,1}$ has very similar results to our best guess of $\tau_0=0.01$ and $\tau_1=1$.
+\newpage
+
+Processing the results graphically carries some further information:  
+
+- our coinflip-hypothesis is holding up  
+- standardising the data leads to more diverse and "nicer" posterior inclusion probabilities, with some variables making huge jumps  
+- the automatic approach of using OLS estimates of the variance for $\tau_{0,1}$ yields very similar results to our best guess of $\tau_0=0.01$ and $\tau_1=1$  
 
 ```{r include=FALSE}
 df = data.frame(pips_z[[2]], pips_z[[4]], pips_z[[6]])
@@ -155,16 +163,183 @@ Note: While fitting a line to the observations doesn't seem to make a lot of sen
 
 ---
 
+\newpage
+
 ## Part 2, Task 1
 
-Here we try reproduce Table 11.1 (Koop 2015) with our function.
+Here we try reproduce Table 11.1 (Koop 2015) with both our function and the BMS package (Feldkircher & Zeugner 2015). In the case of our function we will make use of the defaults, that is the automatic measure of $\tau_0$ and standardisation.
 
-```{r include=FALSE}
-table = ssvs(y, X, save = 20000, burn = 5000)
-table_df = data.frame(names(table$pip), round(table$pip, 3), round(table$post_mean, 3), round(table$post_var_beta, 3), row.names = NULL)
-names(table_df) = c("Expl. Var.", "SSVS PIP", "Post. Mean", "Post. Beta-Var.")
+```{r eval=FALSE, echo=TRUE}
+table_our = ssvs(y, X, 
+                 save = 200000, burn = 100000)
+table_bms = bms(datafls, 
+                burn = 100000, iter = 200000, nmodel = 2000, 
+                mcmc = "bd", g = "UIP", mprior = "random", 
+                mprior.size = NA, user.int = T, start.value = NA, 
+                g.stats = T, logfile = F, logstep = 10000, 
+                force.full.ols = F, fixed.reg = numeric(0))
 ```
 
-```{r}
-kable(table_df)
+```{r include=FALSE}
+table_our = ssvs(y, X, 
+                 save = 200000, burn = 100000)
+table_bms = bms(datafls, 
+                burn = 100000, iter = 200000, nmodel = 2000, 
+                mcmc = "bd", g = "UIP", mprior = "random", 
+                mprior.size = NA, user.int = T, start.value = NA, 
+                g.stats = T, logfile = F, logstep = 10000, 
+                force.full.ols = F, fixed.reg = numeric(0))
+```
+
+```{r include=FALSE}
+bms_df = data.frame(round(coef(table_bms)[, 1:3], 3))
+bms_df$id = rownames(bms_df)
+
+our_df = data.frame(round(table_our$pip, 3), round(table_our$post_mean, 3), round(table_our$post_var_beta, 3), row.names = NULL)
+our_df$id = names(table_our$pip)
+
+table_df = merge(our_df, bms_df, by = "id")
+names(table_df) = c("Expl. Var.", "PIP", "Post_Mean", "Post_SD", "PIP", "Post_Mean", "Post_SD")
+```
+
+The results are definitely comparable - there's quite a bit of variation around the medium inclusion probabilities, but we observe a certain consensus on variables with very low and very high posterior inclusion probabilities. The posterior means are (apart from signs) not very similar - most likely due to the way we implemented standardisation. Due to us choosing $\tau_0$ automatically the interpretation is not as straightforward, but we still see generally higher PIPs on the side of the bms function (which might suggest a lower scaling factor for $\tau_1$). When comparing the PIPs graphically we see that our ssvs function places low PIPs around 20% on most variables, whereas the bms function produces a wider variety of PIPs.
+
+```{r echo=FALSE}
+kable(table_df) %>%
+  row_spec(0, bold = TRUE, align = "l") %>%
+  column_spec(1, bold = TRUE, width = "2.8cm") %>%
+  column_spec(c(2, 5), border_left = TRUE, width = "1.4cm") %>%
+  column_spec(c(3, 4, 6, 7), width = "1.4cm") %>%
+  add_header_above(c("", "Custom" = 3, "BMS" = 3)) %>%
+  kable_styling(font_size = 9)
+```
+
+---
+
+\newpage
+
+## Appendix
+```{r message=FALSE, warning=FALSE, eval=FALSE}
+#' @title Stochastic Search Variable Selection
+#' @author Nikolas Kuschnig
+#' @description Uses the Gibbs sampler to perform SSVS
+#'
+#' @param y The endogenous variable, must be convertible to a matrix.
+#' @param X The explanatory variables, must be convertible to a matrix.
+#' @param tau0 Number by which to scale an "unimportant" variable. Will use least squares estimates if not supplied.
+#' @param tau1 Number by which to scale an "important" variable. Defaults to 100 * tau0.
+#' @param save Iterations to be stored for calculating means.
+#' @param burn Iterations to be discarded before calculating means.
+#' @param s_prior Prior accuracy, i.e. weight assigned to the prior
+#' @param S_prior 1 / sigma^2
+#' @param standardise A boolean determining whether to center and scale X & y.
+#'
+#' @return Returns a list containing the means of posterior: inclusion probability, mean and standard deviation.
+#' @export
+
+ssvs = function(y, 
+                X, 
+                tau0 = NULL, 
+                tau1 = tau0 * 100, 
+                save = 4000, 
+                burn = 1000, 
+                s_prior = 0.01,
+                S_prior = 0.01,
+                standardise = TRUE) {
+  y = matrix(y)
+  X = as.matrix(X)
+
+  N = nrow(y)
+  K = ncol(X)
+  
+  # Standardise (i.e. center and scale) the data if desired
+  if(standardise) {
+    y = scale(y)
+    X = scale(X)
+  }
+  
+  # If no tau0 was supplied set up for OLS estimates, otherwise vectorise
+  if(is.null(tau0)) {
+    c0 = 0.1
+    c1 = ifelse(length(tau1) == 0, 10, tau1)
+  } else {
+    tau0 = rep(tau0, K)
+    tau1 = rep(tau1, K)
+  }
+  
+  # get OLS stuff
+  OLS = solve(crossprod(X)) %*% crossprod(X, y)
+  SSE = as.numeric(crossprod(y - X %*% OLS))
+  sigma_draw = as.numeric(SSE / (N - K))
+  V_beta_draw = sigma_draw * solve(crossprod(X))
+  
+  # use OLS estimates for tau if no tau0 was supplied
+  if(is.null(tau0)) {
+    tau0 <- c0 * sqrt(diag(V_beta_draw))
+    tau1 <- c1 * sqrt(diag(V_beta_draw))
+  }
+  
+  # Set up gamma, and storage matrices
+  gamma = matrix(1, K, 1)
+  V_prior = diag(as.numeric(gamma * tau1 + (1 - gamma) * tau0))
+
+  alpha_store = matrix(NA, save, K)
+  sigma_store = matrix(NA, save, 1)
+  V_beta_store = matrix(NA, save, K)
+  gamma_store = matrix(NA, save, K)
+  
+  # Do the loop
+  for(i in 1:(save + burn)) {
+    # Draw alpha
+    V_post = solve(crossprod(X) / sigma_draw + diag(1 / diag(V_prior)))
+    alpha_post = V_post %*% (crossprod(X, y) / sigma_draw)
+    alpha_draw = alpha_post + t(chol(V_post)) %*% rnorm(K)
+    
+    # Determine inclusion based on alpha
+    for(j in 1:K) {
+      p0 = dnorm(alpha_draw[[j]], 0, sqrt(tau0[j]))
+      p1 = dnorm(alpha_draw[[j]], 0, sqrt(tau1[j]))
+      p11 = p1 / (p0 + p1)
+      
+      gamma[[j]] = ifelse(p11 > runif(1), 1, 0)
+    }
+    
+    # Construct prior VC matrix
+    V_prior = diag(as.numeric(gamma * tau1 + (1 - gamma) * tau0))
+    
+    # Draw sigma^2
+    S_post = S_prior + crossprod(y - X %*% alpha_draw) / 2
+    s_post = S_prior + N / 2
+    sigma_draw = 1 / rgamma(1, s_post, S_post)
+    V_beta_draw = diag(sigma_draw * solve(crossprod(X)))
+    
+    # Ignore the first n(=burn) iterations, store results afterwards
+    if(i > burn) {
+      alpha_store[i - burn, ] = alpha_draw
+      sigma_store[i - burn, ] = sigma_draw
+      V_beta_store[i - burn, ] = V_beta_draw
+      gamma_store[i - burn, ] = gamma
+    }
+  }
+  
+  # Get means for the output
+  pip_mean = apply(gamma_store, 2, mean)
+  alpha_mean = apply(alpha_store, 2, mean)
+  sigma_mean = apply(sigma_store, 2, mean)
+  V_beta_mean = apply(V_beta_store, 2, mean)
+  
+  names(pip_mean) = names(alpha_mean) = names(V_beta_mean) = colnames(X)
+  
+  # Store the parameters used for the output
+  meta_data = list("tau0" = tau0, "tau1" = tau1,
+                   c("save" = save, "burn" = burn,
+                   "s_prior" = s_prior, "S_prior" = S_prior,
+                   "standardise" = standardise))
+  
+  out = list(pip_mean, alpha_mean, sigma_mean, V_beta_mean, meta_data)
+  
+  names(out) = c("pip", "post_mean", "post_std", "post_var_beta", "meta")
+
+  return(out)
+}
 ```

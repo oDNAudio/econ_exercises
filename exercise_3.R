@@ -102,3 +102,8 @@ p4 = ggplot(df4, aes(x = id, y = automatic)) +
 p4
 
 plot_grid(p1, p2, p3, p4)
+
+table = ssvs(y, X, save = 20000, burn = 5000)
+table_df = data.frame(names(table$pip), table$pip, table$post_mean, table$post_var_beta, 
+                      row.names = NULL)
+names(table_df) = c("Explanatory Variable", "SSVS Post. Prob.", "Post. Mean", "Post. Beta-Var.")

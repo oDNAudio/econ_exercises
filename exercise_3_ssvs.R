@@ -1,4 +1,3 @@
-## ---- exercise_3_svss.R
 #' @title Stochastic Search Variable Selection
 #' @author Nikolas Kuschnig
 #' @description Uses the Gibbs sampler to perform SSVS
