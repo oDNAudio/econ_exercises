@@ -16,18 +16,22 @@ logML <- function(Y, X, lags, par, Y_row, Y_col,
              soc / par$miu)
   X <- rbind(X, 
              c(1 / par$theta, rep(sur, lags)), 
-             cbind(rep(0, Y_col), matrix(rep(soc, lags) / par$miu, nrow = Y_col))) ### changed a bit here in cbind
+             cbind(rep(0, Y_col), 
+                   matrix(rep(soc, lags) / par$miu, nrow = Y_col)))
   
   Dummy_row <- nrow(Y) - Y_row
   Y_row <- nrow(Y)
   
   omega_inv <- diag(1 / omega)
-  beta_hat <- solve(crossprod(X) + omega_inv) %*% (crossprod(X, Y) + omega_inv %*% mn_mean)
+  beta_hat <- solve(crossprod(X) + omega_inv) %*% 
+    (crossprod(X, Y) + omega_inv %*% mn_mean)
   sse <- crossprod(Y - X %*% beta_hat)
   
   psi_inv <- solve(sqrt(psi))
   aaa <- diag(sqrt(omega)) %*% crossprod(X) %*% diag(sqrt(omega))
-  bbb <- psi_inv %*% (sse + t(beta_hat - mn_mean) %*% omega_inv %*% (beta_hat - mn_mean)) %*% psi_inv
+  bbb <- psi_inv %*% 
+    (sse + t(beta_hat - mn_mean) %*% omega_inv %*% (beta_hat - mn_mean)) %*% 
+    psi_inv
   
   aaa_eig <- Re(eigen(aaa, only.values = TRUE)$values)
   aaa_eig[aaa_eig < 1e-12] <- 0
@@ -38,8 +42,8 @@ logML <- function(Y, X, lags, par, Y_row, Y_col,
   
   logML <- (-Y_col * Y_row * log(pi) / 2) + 
     sum(lgamma(((Y_row + Y_col + 2) - 0:(Y_col - 1)) / 2)) - 
-    sum(lgamma(((Y_col + 2) - 0:(Y_col -1)) / 2)) - ## added sum() here
-    (Y_row * sum(log(diag(psi))) / 2) - ## added diag() here around psi, otherwise it returns Inf
+    sum(lgamma(((Y_col + 2) - 0:(Y_col -1)) / 2)) - 
+    (Y_row * sum(log(diag(psi))) / 2) - 
     (Y_col * sum(log(aaa_eig)) / 2) + 
     ((Y_row + Y_col + 2) * sum(log(bbb_eig)) / 2)
   
@@ -52,17 +56,18 @@ logML <- function(Y, X, lags, par, Y_row, Y_col,
   
   S <- psi + sse + t(beta_hat - mn_mean) %*% omega_inv %*% (beta_hat - mn_mean)
   S_eig <- eigen(S)
-  S_inv <- S_eig$vectors %*% diag(1 / abs(S_eig$values)) %*% t(S_eig$vectors) ### diag(1 / abs(diag(S_eig$values))); deleted diag() here, eigen() has different outputs than eig() in matlab
+  S_inv <- S_eig$vectors %*% diag(1 / abs(S_eig$values)) %*% t(S_eig$vectors)
   eta <- MASS::mvrnorm(n = (Y_row + Y_col + 2), mu = rep(0, Y_col), Sigma = S_inv)
   sigma_draw <- solve(crossprod(eta)) %*% diag(Y_col)
   sigma_chol <- chol(sigma_draw)
   beta_draw <- beta_hat + 
-    t(MASS::mvrnorm(n = Y_col, # added a transpose here
-            mu = rep(0, (1 + Y_col * lags)), 
-            Sigma = crossprod(X) + omega_inv)) %*% sigma_chol
+    t(MASS::mvrnorm(n = Y_col, 
+                    mu = rep(0, (1 + Y_col * lags)), 
+                    Sigma = crossprod(X) + omega_inv)) %*% 
+    sigma_chol
   
   
-  return(list(logML = logML, beta_draw = beta_draw, sigma_draw = sigma_draw))
+  return(list("logML" = logML, "beta_draw" = beta_draw, "sigma_draw" = sigma_draw))
 }
 
 lgamma_pdf <- function(x, k, theta) {

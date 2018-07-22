@@ -62,7 +62,7 @@ bvar <- function(data,
                  "miu" = par_modes$miu,
                  "theta" = par_modes$theta)
 
-  # put this in function
+  # put this in a function, also consider drawing from normal instead
   in_bounds = FALSE
   while(!in_bounds) {
     par_draw <- MASS::mvrnorm(n = 1, mu = post_mode, Sigma = HH)
@@ -77,7 +77,14 @@ bvar <- function(data,
   logML_save <- logML(Y, X, lags, par = par_draw, Y_row = N, Y_col = M,
                  mn_mean, mn_sd, mn_var, Y0, prior_coef)
 
-  for(i in 1:(nburn + nsave)) {
+  # storage
+  accept_store <- vector(1, nburn + nsave) # Original does this badly, still not optimal
+  par_store <- matrix("numeric", nsave, length(post_mode))
+  beta_store <- vector("numeric", nsave)
+  sigma_store <- vector("numeric", nsave)
+
+  for(i in (1 - nburn):nsave) {
+    # see above, also could all be calculated at once
     in_bounds = FALSE
     while(!in_bounds) {
       par_draw <- MASS::mvrnorm(n = 1, mu = post_mode, Sigma = HH)
@@ -96,86 +103,85 @@ bvar <- function(data,
     } else if(runif(1) < exp(logML_draw - logML_save)) {
       logML_save <- logML_draw
     } else {
+      accepted <- 0
       # draw sigma and beta with previous par
     }
 
-    if(i > burn) {
-      # store shit
+    if(i > 0) {
+      accept_store[i] <- accept
+      par_store[i, ] <- par_draw
+      beta_store[i] <- logML_draw$beta_draw
+      sigma_store[i] <- logML_draw$sigma_draw
     }
+    accepted <- 1
   }
 
-  # # Add priors
-  # if(mn_prior) {
-  #   mn_prior <- minnesota_prior(Y, theta, gamma, delta, M, lags)
-  #   Y <- rbind(m_prior$Y, Y)
-  #   X <- rbind(m_prior$X, X)
+  acceptance <- mean(accept_store)
+  ### proceed with caution
+
+  # # Get posteriors
+  # V_post <- solve(crossprod(X))
+  # A_post <- V_post %*% crossprod(X, Y)
+  # S_post <- crossprod(Y - X %*% A_post)
+  # S_post_inv <- solve(S_post)
+  # v_post <- nrow(Y)
+  #
+  # # Pre-calculate 1-step predictive density
+  # if(constant) {
+  #   if(lags == 1) {
+  #     X_pred <- c(Y[N, ], 1)
+  #   } else {
+  #     X_pred <- c(Y[N, ], X[N, 1:(M * (lags - 1))], 1)
+  #   }
+  # } else {
+  #   if(lags == 1) {
+  #     X_pred <- Y[N, ]
+  #   } else {
+  #     X_pred <- c(Y[N, ], X[N, 1:(M * (lags - 1))])
+  #   }
   # }
-  # if(coeff_prior) sum_coeff_prior()
-  # if(prior3) prior3()
-
-  # Get posteriors
-  V_post <- solve(crossprod(X))
-  A_post <- V_post %*% crossprod(X, Y)
-  S_post <- crossprod(Y - X %*% A_post)
-  S_post_inv <- solve(S_post)
-  v_post <- nrow(Y)
-
-  # Pre-calculate 1-step predictive density
-  if(constant) {
-    if(lags == 1) {
-      X_pred <- c(Y[N, ], 1)
-    } else {
-      X_pred <- c(Y[N, ], X[N, 1:(M * (lags - 1))], 1)
-    }
-  } else {
-    if(lags == 1) {
-      X_pred <- Y[N, ]
-    } else {
-      X_pred <- c(Y[N, ], X[N, 1:(M * (lags - 1))])
-    }
-  }
-
-  # Loop
-  A_store <- array(0, c(nsave, K, M))
-  Y_store <- matrix(0, nsave, M)
-  IRF_store <- array(NA, c(nsave, M, M, horizon))
-
-  for(i in 1:(nburn + nsave)) {
-    # Posterior of A
-    V_sim <- kronecker(sig, V_post)
-    V_chol <- t(chol(V_sim))
-    A_draw <- as.vector(A_post) + V_chol %*% rnorm(K * M)
-    A_draw <- matrix(A_draw, K, M)
-    # Posterior of Sigma
-    sig_inv <- matrix(rWishart(1, v_post, S_post_inv), M, M)
-    sig <- solve(sig_inv)
-
-    if(i > nburn) {
-      A_store[i - nburn, , ] <- A_draw
-
-      # 1-step predicitve density
-      Y_store[i - nburn, ] <- X_pred %*% A_draw + t(t(chol(sig)) %*% rnorm(M))
-
-      ### Impulse responses
-
-      # 1. Companion Matrix
-      comp_size <- ifelse(constant, K - 1, K)
-      B_comp <- matrix(0, comp_size, comp_size)
-      B_comp[1:M, ] <- t(A_draw[1:comp_size, ])
-      if(lags > 1) B_comp[(M + 1):comp_size, 1:(comp_size - M)] <- diag(M * (lags - 1))
-
-      # 2. Compute IR
-      shock <- t(chol(sig))
-
-      IRF_draw <- array(0, c(M * lags, M * lags, horizon))
-      IRF_draw[1:M, 1:M, 1] <- shock
-      for(j in 2:horizon) {
-        IRF_draw[, , j] <- IRF_draw[, , j - 1] %*% t(B_comp)
-      }
-      IRF_draw <- IRF_draw[1:M, 1:M, ]
-      IRF_store[i - nburn, , ,] <- IRF_draw
-    }
-  }
+  #
+  # # Loop
+  # A_store <- array(0, c(nsave, K, M))
+  # Y_store <- matrix(0, nsave, M)
+  # IRF_store <- array(NA, c(nsave, M, M, horizon))
+  #
+  # for(i in 1:(nburn + nsave)) {
+  #   # Posterior of A
+  #   V_sim <- kronecker(sig, V_post)
+  #   V_chol <- t(chol(V_sim))
+  #   A_draw <- as.vector(A_post) + V_chol %*% rnorm(K * M)
+  #   A_draw <- matrix(A_draw, K, M)
+  #   # Posterior of Sigma
+  #   sig_inv <- matrix(rWishart(1, v_post, S_post_inv), M, M)
+  #   sig <- solve(sig_inv)
+  #
+  #   if(i > nburn) {
+  #     A_store[i - nburn, , ] <- A_draw
+  #
+  #     # 1-step predicitve density
+  #     Y_store[i - nburn, ] <- X_pred %*% A_draw + t(t(chol(sig)) %*% rnorm(M))
+  #
+  #     ### Impulse responses
+  #
+  #     # 1. Companion Matrix
+  #     comp_size <- ifelse(constant, K - 1, K)
+  #     B_comp <- matrix(0, comp_size, comp_size)
+  #     B_comp[1:M, ] <- t(A_draw[1:comp_size, ])
+  #     if(lags > 1) B_comp[(M + 1):comp_size, 1:(comp_size - M)] <- diag(M * (lags - 1))
+  #
+  #     # 2. Compute IR
+  #     shock <- t(chol(sig))
+  #
+  #     IRF_draw <- array(0, c(M * lags, M * lags, horizon))
+  #     IRF_draw[1:M, 1:M, 1] <- shock
+  #     for(j in 2:horizon) {
+  #       IRF_draw[, , j] <- IRF_draw[, , j - 1] %*% t(B_comp)
+  #     }
+  #     IRF_draw <- IRF_draw[1:M, 1:M, ]
+  #     IRF_store[i - nburn, , ,] <- IRF_draw
+  #   }
+  # }
 
   out <- list("A" = A_store, "Y" = Y_store, "IRF" = IRF_store)
 }
