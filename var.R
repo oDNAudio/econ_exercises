@@ -73,7 +73,7 @@ bvar <- function(data,
     }
   }
 
-  # psi and alpha are still needed in par
+  par <- as.list(par, "alpha" = mn_alpha, "psi" = mn_sd)
   logML_save <- logML(Y, X, lags, par = par_draw, Y_row = N, Y_col = M,
                  mn_mean, mn_sd, mn_var, Y0, prior_coef)
 
@@ -87,6 +87,7 @@ bvar <- function(data,
         in_bounds <- TRUE
       }
     }
+    par <- as.list(par, "alpha" = mn_alpha, "psi" = mn_sd)
     logML_draw <- logML(Y, X, lags, par = par_draw, Y_row = N, Y_col = M,
                         mn_mean, mn_sd, mn_var, Y0, prior_coef)
 
