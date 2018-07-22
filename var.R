@@ -62,6 +62,7 @@ bvar <- function(data,
                  "miu" = par_modes$miu,
                  "theta" = par_modes$theta)
 
+  # put this in function
   in_bounds = FALSE
   while(!in_bounds) {
     par_draw <- MASS::mvrnorm(n = 1, mu = post_mode, Sigma = HH)
@@ -72,8 +73,35 @@ bvar <- function(data,
     }
   }
 
-  logML <- logML(Y, X, lags, par = par_draw, Y_row = N, Y_col = M,
+  # psi and alpha are still needed in par
+  logML_save <- logML(Y, X, lags, par = par_draw, Y_row = N, Y_col = M,
                  mn_mean, mn_sd, mn_var, Y0, prior_coef)
+
+  for(i in 1:(nburn + nsave)) {
+    in_bounds = FALSE
+    while(!in_bounds) {
+      par_draw <- MASS::mvrnorm(n = 1, mu = post_mode, Sigma = HH)
+      if(!any(par_draw[1] < par_min[1] || par_draw[1] > par_max[1],
+              par_draw[2] < par_min[2] || par_draw[2] > par_max[2],
+              par_draw[3] < par_min[3] || par_draw[3] > par_max[3])) {
+        in_bounds <- TRUE
+      }
+    }
+    logML_draw <- logML(Y, X, lags, par = par_draw, Y_row = N, Y_col = M,
+                        mn_mean, mn_sd, mn_var, Y0, prior_coef)
+
+    if(logML_draw > logML_save) {
+      logML_save <- logML_draw
+    } else if(runif(1) < exp(logML_draw - logML_save)) {
+      logML_save <- logML_draw
+    } else {
+      # draw sigma and beta with previous par
+    }
+
+    if(i > burn) {
+      # store shit
+    }
+  }
 
   # # Add priors
   # if(mn_prior) {

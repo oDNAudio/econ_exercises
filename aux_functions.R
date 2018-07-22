@@ -1,17 +1,5 @@
-logML <- function(Y, X, lags, par, Y_row, Y_col, min = NULL, max = NULL, 
+logML <- function(Y, X, lags, par, Y_row, Y_col, 
                   mn_mean, mn_sd, mn_var, Y0, prior_coef) {
-  
-  if(!is.null(min) && !is.null(max)) {
-    # if(any(par$lambda < min$lambda || par$lambda < max$lambda, 
-    #        par$psi < min$psi || par$psi < max$psi, 
-    #        par$theta < min$theta || par$theta < max$theta, 
-    #        par$miu < min$miu || par$miu < max$miu, 
-    #        par$alpha < min$alpha || par$alpha < max$alpha)) {
-    #   
-    #   return(list(logML = -10e15, beta_draw = NULL, sigma_draw = NULL))
-    #   #stop("Parameters outside bounds - Quitting.")
-    # }
-  }
   
   omega <- vector("numeric", 1 + Y_col * lags)
   omega[1] <- mn_var
@@ -28,7 +16,7 @@ logML <- function(Y, X, lags, par, Y_row, Y_col, min = NULL, max = NULL,
              soc / par$miu)
   X <- rbind(X, 
              c(1 / par$theta, rep(sur, lags)), 
-             cbind(rep(0, Y_col), matrix(rep(soc, lags) / par$miu,nrow = Y_col))) ### changed a bit here in cbind
+             cbind(rep(0, Y_col), matrix(rep(soc, lags) / par$miu, nrow = Y_col))) ### changed a bit here in cbind
   
   Dummy_row <- nrow(Y) - Y_row
   Y_row <- nrow(Y)
